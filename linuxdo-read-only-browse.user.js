@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Forum Read-Only Browse Helper
 // @namespace    https://github.com/huangsijun17/linuxdo-read-plugin
-// @version      0.5.1
+// @version      0.5.2
 // @description  Read topics on whitelisted Discourse-style forums with visible, manual controls, optional assistive main-post likes, normal-distribution timing, and simple anti-bot challenge detection. No comments, bookmarks, or other interactions.
 // @author       huangsijun17
 // @match        https://linux.do/*
@@ -65,6 +65,8 @@
     runStartedAt: 0,
     runCompletedTopics: 0,
     panelCollapsed: false,
+    panelSide: "right",
+    panelY: -1,
     mainPostLikeThreshold: 0,
     mainPostLikeThresholdMin: 0,
     mainPostLikeThresholdMax: 0,
@@ -514,6 +516,11 @@
         background: #f5f5f5;
         color: transparent;
         font-size: 0;
+        cursor: grab;
+        touch-action: none;
+      }
+      #linuxdo-read-only-helper.ldo-roh-collapsed .ldo-roh-collapse:active {
+        cursor: grabbing;
       }
       #linuxdo-read-only-helper.ldo-roh-collapsed .ldo-roh-collapse::before {
         content: "";
@@ -636,11 +643,39 @@
     return panel;
   }
 
+  // Places the panel/logo at the persisted anchor: snapped to the left/right edge,
+  // with panelY as the vertical position. panelY < 0 keeps the default corner spot.
+  function applyPanelPosition() {
+    const panel = buildPanel();
+    const state = loadState();
+    const y = Number(state.panelY);
+    if (!Number.isFinite(y) || y < 0) {
+      panel.style.left = "";
+      panel.style.top = "";
+      panel.style.right = "";
+      panel.style.bottom = "";
+      return;
+    }
+
+    const collapsed = panel.classList.contains("ldo-roh-collapsed");
+    const width = collapsed ? 58 : panel.offsetWidth || 230;
+    const height = collapsed ? 58 : panel.offsetHeight || 320;
+    const side = state.panelSide === "left" ? "left" : "right";
+    const left = side === "right" ? Math.max(16, window.innerWidth - width - 16) : 16;
+    const top = Math.min(Math.max(y, 8), Math.max(8, window.innerHeight - height - 8));
+
+    panel.style.right = "auto";
+    panel.style.bottom = "auto";
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+  }
+
   function syncPanelVisibility() {
     const panel = buildPanel();
     const state = loadState();
     panel.classList.toggle("ldo-roh-collapsed", state.panelCollapsed);
     panel.querySelector('[data-role="collapse"]').textContent = state.panelCollapsed ? "展开" : "收起";
+    applyPanelPosition();
   }
 
   function syncDailyReadCount() {
@@ -1007,8 +1042,74 @@
     syncInputsFromState();
     syncPanelVisibility();
     syncDailyReadCount();
+    applyPanelPosition();
+    window.addEventListener("resize", applyPanelPosition);
+
+    let dragState = null;
+    let suppressCollapseClick = false;
+
+    const endLogoDrag = (event) => {
+      if (!dragState || event.pointerId !== dragState.pointerId) return;
+      const dragged = dragState.moved;
+      dragState = null;
+      if (!dragged) return;
+
+      suppressCollapseClick = true;
+      const rect = buildPanel().getBoundingClientRect();
+      saveState({
+        panelSide: rect.left + rect.width / 2 < window.innerWidth / 2 ? "left" : "right",
+        panelY: rect.top,
+      });
+      const panelNow = buildPanel();
+      panelNow.style.transition = "left 0.15s ease, top 0.15s ease";
+      applyPanelPosition();
+      window.setTimeout(() => {
+        buildPanel().style.transition = "";
+      }, 220);
+    };
+
+    collapse.addEventListener("pointerdown", (event) => {
+      if (!event.isPrimary || !buildPanel().classList.contains("ldo-roh-collapsed")) return;
+      const rect = buildPanel().getBoundingClientRect();
+      dragState = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        startLeft: rect.left,
+        startTop: rect.top,
+        moved: false,
+      };
+      try {
+        collapse.setPointerCapture(event.pointerId);
+      } catch {
+        /* pointer capture unsupported: dragging still works while held */
+      }
+    });
+
+    collapse.addEventListener("pointermove", (event) => {
+      if (!dragState || event.pointerId !== dragState.pointerId) return;
+      const dx = event.clientX - dragState.startX;
+      const dy = event.clientY - dragState.startY;
+      if (!dragState.moved && Math.hypot(dx, dy) < 6) return;
+      dragState.moved = true;
+      const panelNow = buildPanel();
+      const left = Math.min(Math.max(dragState.startLeft + dx, 0), Math.max(0, window.innerWidth - 58));
+      const top = Math.min(Math.max(dragState.startTop + dy, 0), Math.max(0, window.innerHeight - 58));
+      panelNow.style.right = "auto";
+      panelNow.style.bottom = "auto";
+      panelNow.style.transition = "none";
+      panelNow.style.left = `${left}px`;
+      panelNow.style.top = `${top}px`;
+    });
+
+    collapse.addEventListener("pointerup", endLogoDrag);
+    collapse.addEventListener("pointercancel", endLogoDrag);
 
     collapse.addEventListener("click", () => {
+      if (suppressCollapseClick) {
+        suppressCollapseClick = false;
+        return;
+      }
       saveState({ panelCollapsed: !loadState().panelCollapsed });
       syncPanelVisibility();
     });
