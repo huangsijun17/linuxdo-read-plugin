@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Forum Read-Only Browse Helper
 // @namespace    https://github.com/huangsijun17/linuxdo-read-plugin
-// @version      0.5.3
+// @version      0.5.4
 // @description  Read topics on whitelisted Discourse-style forums with visible, manual controls, optional assistive main-post likes, normal-distribution timing, and simple anti-bot challenge detection. No comments, bookmarks, or other interactions.
 // @author       huangsijun17
 // @match        https://linux.do/*
@@ -1066,7 +1066,8 @@
     let suppressCollapseClick = false;
 
     const endLogoDrag = (event) => {
-      if (!dragState || event.pointerId !== dragState.pointerId) return;
+      if (!dragState) return;
+      if (event && event.pointerId !== undefined && event.pointerId !== dragState.pointerId) return;
       const dragged = dragState.moved;
       dragState = null;
       if (!dragged) return;
@@ -1127,6 +1128,14 @@
 
     collapse.addEventListener("pointerup", endLogoDrag);
     collapse.addEventListener("pointercancel", endLogoDrag);
+    collapse.addEventListener("lostpointercapture", endLogoDrag);
+    // Safety net: if pointer capture is unavailable, pointerup can land off the
+    // logo; always end the drag there so it can never be left mid-screen.
+    window.addEventListener("pointerup", endLogoDrag);
+    window.addEventListener("pointercancel", endLogoDrag);
+    window.addEventListener("blur", () => {
+      if (dragState) endLogoDrag();
+    });
 
     collapse.addEventListener("click", () => {
       if (suppressCollapseClick) {
