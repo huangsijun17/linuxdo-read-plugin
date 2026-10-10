@@ -1,6 +1,6 @@
-<svg width="322" height="650" viewBox="0 0 322 650" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="1" y="0" width="320" height="650" rx="14" fill="#2E3033"/>
-  <text x="18" y="37" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">LINUX DO 只读浏览</text>
+<svg width="322" height="705" viewBox="0 0 322 705" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="1" y="0" width="320" height="705" rx="14" fill="#2E3033"/>
+  <text x="18" y="37" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">论坛只读浏览</text>
   <rect x="254" y="16" width="51" height="32" rx="8" fill="#F5F5F5"/>
   <text x="263" y="37" fill="#111111" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="15">收起</text>
   <circle cx="282" cy="74" r="25" fill="#F5F5F5"/>
@@ -10,54 +10,75 @@
 
   <text x="18" y="70" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="17">阅读帖子中 2/7</text>
   <text x="18" y="94" fill="#FFFFFF" opacity="0.88" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="13">今日已读 12 篇 / 新话题 9 个 / 点赞 4 次</text>
-  <text x="18" y="112" fill="#FFFFFF" opacity="0.88" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="13">本轮 3/20 篇 / 18/120 分</text>
+  <text x="18" y="112" fill="#FFFFFF" opacity="0.88" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="13">本轮 3/21 篇 / 18/113 分</text>
 
   <rect x="18" y="128" width="287" height="38" rx="8" fill="#57513C"/>
   <text x="30" y="152" fill="#FFE6A3" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="17">主帖 3 赞，未达到阈值</text>
 
-  <text x="18" y="208" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">阅读秒数</text>
-  <rect x="153" y="176" width="67" height="38" rx="8" fill="#FFFFFF"/>
-  <text x="168" y="201" fill="#111111" font-family="Arial, sans-serif" font-size="19">8</text>
-  <text x="225" y="203" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="21">-</text>
-  <rect x="239" y="176" width="66" height="38" rx="8" fill="#FFFFFF"/>
-  <text x="254" y="201" fill="#111111" font-family="Arial, sans-serif" font-size="19">20</text>
+  <text x="18" y="191" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">阅读秒数</text>
+  <rect x="153" y="168" width="67" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="168" y="191" fill="#111111" font-family="Arial, sans-serif" font-size="18">8</text>
+  <text x="225" y="193" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="21">-</text>
+  <rect x="239" y="168" width="66" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="254" y="191" fill="#111111" font-family="Arial, sans-serif" font-size="18">20</text>
 
-  <text x="18" y="260" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">间隔秒数</text>
-  <rect x="153" y="229" width="67" height="34" rx="8" fill="#FFFFFF"/>
-  <text x="168" y="252" fill="#111111" font-family="Arial, sans-serif" font-size="18">5</text>
-  <text x="225" y="255" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="21">-</text>
-  <rect x="239" y="229" width="66" height="34" rx="8" fill="#FFFFFF"/>
-  <text x="254" y="252" fill="#111111" font-family="Arial, sans-serif" font-size="18">14</text>
+  <text x="18" y="239" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">间隔秒数</text>
+  <rect x="153" y="216" width="67" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="168" y="239" fill="#111111" font-family="Arial, sans-serif" font-size="18">5</text>
+  <text x="225" y="241" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="21">-</text>
+  <rect x="239" y="216" width="66" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="254" y="239" fill="#111111" font-family="Arial, sans-serif" font-size="18">14</text>
 
-  <text x="18" y="312" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">滚动步数</text>
-  <rect x="153" y="284" width="67" height="34" rx="8" fill="#FFFFFF"/>
-  <text x="168" y="307" fill="#111111" font-family="Arial, sans-serif" font-size="18">3</text>
-  <text x="225" y="310" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="21">-</text>
-  <rect x="239" y="284" width="66" height="34" rx="8" fill="#FFFFFF"/>
-  <text x="254" y="307" fill="#111111" font-family="Arial, sans-serif" font-size="18">0</text>
+  <text x="18" y="287" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">滚动步数</text>
+  <rect x="153" y="264" width="67" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="168" y="287" fill="#111111" font-family="Arial, sans-serif" font-size="18">3</text>
+  <text x="225" y="289" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="21">-</text>
+  <rect x="239" y="264" width="66" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="254" y="287" fill="#111111" font-family="Arial, sans-serif" font-size="18">0</text>
 
-  <text x="18" y="365" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">读几篇休息</text>
-  <rect x="239" y="337" width="66" height="34" rx="8" fill="#FFFFFF"/>
-  <text x="254" y="360" fill="#111111" font-family="Arial, sans-serif" font-size="18">10</text>
+  <text x="18" y="335" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">读几篇休息</text>
+  <rect x="153" y="312" width="67" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="168" y="335" fill="#111111" font-family="Arial, sans-serif" font-size="18">10</text>
+  <text x="225" y="337" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="21">-</text>
+  <rect x="239" y="312" width="66" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="254" y="335" fill="#111111" font-family="Arial, sans-serif" font-size="18">15</text>
 
-  <text x="18" y="418" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">休息秒数</text>
-  <rect x="239" y="390" width="66" height="34" rx="8" fill="#FFFFFF"/>
-  <text x="254" y="413" fill="#111111" font-family="Arial, sans-serif" font-size="18">300</text>
+  <text x="18" y="383" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">休息秒数</text>
+  <rect x="153" y="360" width="67" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="168" y="383" fill="#111111" font-family="Arial, sans-serif" font-size="18">300</text>
+  <text x="225" y="385" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="21">-</text>
+  <rect x="239" y="360" width="66" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="254" y="383" fill="#111111" font-family="Arial, sans-serif" font-size="18">480</text>
 
-  <text x="18" y="471" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">最大帖子</text>
-  <rect x="239" y="443" width="66" height="34" rx="8" fill="#FFFFFF"/>
-  <text x="254" y="466" fill="#111111" font-family="Arial, sans-serif" font-size="18">20</text>
+  <text x="18" y="431" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">最大帖子</text>
+  <rect x="153" y="408" width="67" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="168" y="431" fill="#111111" font-family="Arial, sans-serif" font-size="18">18</text>
+  <text x="225" y="433" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="21">-</text>
+  <rect x="239" y="408" width="66" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="254" y="431" fill="#111111" font-family="Arial, sans-serif" font-size="18">22</text>
 
-  <text x="18" y="524" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">最长分钟</text>
-  <rect x="239" y="496" width="66" height="34" rx="8" fill="#FFFFFF"/>
-  <text x="254" y="519" fill="#111111" font-family="Arial, sans-serif" font-size="18">120</text>
+  <text x="18" y="479" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">最长分钟</text>
+  <rect x="153" y="456" width="67" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="168" y="479" fill="#111111" font-family="Arial, sans-serif" font-size="18">110</text>
+  <text x="225" y="481" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="21">-</text>
+  <rect x="239" y="456" width="66" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="254" y="479" fill="#111111" font-family="Arial, sans-serif" font-size="18">130</text>
 
-  <text x="18" y="577" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">自动点赞</text>
-  <rect x="281" y="560" width="17" height="17" rx="2" fill="#16A9E8"/>
-  <path d="M285 568.5L288.7 572.2L295 564.5" stroke="white" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="18" y="527" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">正态随机</text>
+  <rect x="281" y="512" width="17" height="17" rx="3" fill="#FFFFFF" stroke="#8A8A8A" stroke-width="1.5"/>
 
-  <rect x="18" y="599" width="138" height="37" rx="8" fill="#FFADB4"/>
-  <text x="71" y="623" fill="#111111" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="17">停止</text>
-  <rect x="166" y="599" width="139" height="37" rx="8" fill="#F5F5F5"/>
-  <text x="211" y="623" fill="#111111" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="17">清记录</text>
+  <text x="18" y="575" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">主帖赞阈值</text>
+  <rect x="153" y="552" width="67" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="168" y="575" fill="#111111" font-family="Arial, sans-serif" font-size="18">3</text>
+  <text x="225" y="577" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="21">-</text>
+  <rect x="239" y="552" width="66" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="254" y="575" fill="#111111" font-family="Arial, sans-serif" font-size="18">8</text>
+
+  <text x="18" y="623" fill="#FFFFFF" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700">自动点赞</text>
+  <rect x="281" y="608" width="17" height="17" rx="3" fill="#FFFFFF" stroke="#8A8A8A" stroke-width="1.5"/>
+
+  <rect x="18" y="648" width="138" height="37" rx="8" fill="#9EE493"/>
+  <text x="71" y="672" fill="#111111" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="17">开始</text>
+  <rect x="166" y="648" width="139" height="37" rx="8" fill="#F5F5F5"/>
+  <text x="211" y="672" fill="#111111" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="17">清记录</text>
 </svg>

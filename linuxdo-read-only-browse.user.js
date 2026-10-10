@@ -1,15 +1,22 @@
 // ==UserScript==
-// @name         LINUX DO Read-Only Browse Helper
-// @namespace    https://linux.do/
-// @version      0.4.6
-// @description  Read latest LINUX DO topics with visible, manual controls and optional assistive main-post likes. No comments, bookmarks, or other interactions.
-// @author       Codex
+// @name         Forum Read-Only Browse Helper
+// @namespace    https://github.com/huangsijun17/linuxdo-read-plugin
+// @version      0.5.1
+// @description  Read topics on whitelisted Discourse-style forums with visible, manual controls, optional assistive main-post likes, normal-distribution timing, and simple anti-bot challenge detection. No comments, bookmarks, or other interactions.
+// @author       huangsijun17
 // @match        https://linux.do/*
+// @match        https://www.linux.do/*
+// @match        https://nodeloc.com/*
+// @match        https://www.nodeloc.com/*
+// @match        https://meta.discourse.org/*
+// @match        https://discuss.python.org/*
+// @match        https://forum.vuejs.org/*
+// @match        https://forum.arduino.cc/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @run-at       document-idle
-// @downloadURL  https://raw.githubusercontent.com/baiya123/linuxdo-read-plugin/main/linuxdo-read-only-browse.user.js
-// @updateURL    https://raw.githubusercontent.com/baiya123/linuxdo-read-plugin/main/linuxdo-read-only-browse.user.js
+// @downloadURL  https://raw.githubusercontent.com/huangsijun17/linuxdo-read-plugin/main/linuxdo-read-only-browse.user.js
+// @updateURL    https://raw.githubusercontent.com/huangsijun17/linuxdo-read-plugin/main/linuxdo-read-only-browse.user.js
 // ==/UserScript==
 
 (function () {
@@ -19,6 +26,16 @@
   const VISITED_LIMIT = 1000;
   const DAILY_TOPIC_LIMIT = 2000;
   const LIST_REFRESH_AFTER_TOPICS = 10;
+  // Domains the script may run on. Keep this list in sync with the @match whitelist above.
+  // To support another Discourse-style forum, add an @match line and one entry here.
+  const DOMAIN_WHITELIST = [
+    "linux.do",
+    "nodeloc.com",
+    "meta.discourse.org",
+    "discuss.python.org",
+    "forum.vuejs.org",
+    "forum.arduino.cc",
+  ];
   const DEFAULTS = {
     enabled: false,
     minReadMs: 25000,
@@ -27,16 +44,30 @@
     maxPauseMs: 14000,
     scrollStepsMin: 3,
     scrollStepsMax: 8,
+    normalDistribution: false,
     breakAfterTopics: 10,
+    breakAfterTopicsMin: 10,
+    breakAfterTopicsMax: 15,
+    breakAfterTarget: 10,
     longBreakMs: 300000,
+    longBreakMinMs: 300000,
+    longBreakMaxMs: 480000,
     topicsReadInBatch: 0,
     topicsReadSinceListRefresh: 0,
     maxRunTopics: 0,
+    maxRunTopicsMin: 0,
+    maxRunTopicsMax: 0,
     maxRunMinutes: 0,
+    maxRunMinutesMin: 0,
+    maxRunMinutesMax: 0,
+    runTopicLimit: 0,
+    runMinutesLimit: 0,
     runStartedAt: 0,
     runCompletedTopics: 0,
     panelCollapsed: false,
     mainPostLikeThreshold: 0,
+    mainPostLikeThresholdMin: 0,
+    mainPostLikeThresholdMax: 0,
     autoLikeMainPost: false,
     autoLiked: [],
     dailyReadDate: "",
@@ -58,10 +89,53 @@
     }
   };
 
-  const loadState = () => ({
-    ...DEFAULTS,
-    ...safeJson(GM_getValue(STORAGE_KEY, "{}"), {}),
-  });
+  const loadState = () => {
+    const stored = safeJson(GM_getValue(STORAGE_KEY, "{}"), {}) || {};
+    const state = { ...DEFAULTS, ...stored };
+    // Migrate pre-0.5.0 single-value break settings into ranges without touching stored keys.
+    if (
+      stored.breakAfterTopics !== undefined &&
+      stored.breakAfterTopicsMin === undefined &&
+      stored.breakAfterTopicsMax === undefined
+    ) {
+      state.breakAfterTopicsMin = stored.breakAfterTopics;
+      state.breakAfterTopicsMax = stored.breakAfterTopics;
+    }
+    if (stored.longBreakMs !== undefined && stored.longBreakMinMs === undefined && stored.longBreakMaxMs === undefined) {
+      state.longBreakMinMs = stored.longBreakMs;
+      state.longBreakMaxMs = stored.longBreakMs;
+    }
+    if (stored.breakAfterTarget === undefined) {
+      state.breakAfterTarget = state.breakAfterTopicsMin;
+    }
+    if (stored.maxRunTopics !== undefined && stored.maxRunTopicsMin === undefined && stored.maxRunTopicsMax === undefined) {
+      state.maxRunTopicsMin = stored.maxRunTopics;
+      state.maxRunTopicsMax = stored.maxRunTopics;
+    }
+    if (
+      stored.maxRunMinutes !== undefined &&
+      stored.maxRunMinutesMin === undefined &&
+      stored.maxRunMinutesMax === undefined
+    ) {
+      state.maxRunMinutesMin = stored.maxRunMinutes;
+      state.maxRunMinutesMax = stored.maxRunMinutes;
+    }
+    if (
+      stored.mainPostLikeThreshold !== undefined &&
+      stored.mainPostLikeThresholdMin === undefined &&
+      stored.mainPostLikeThresholdMax === undefined
+    ) {
+      state.mainPostLikeThresholdMin = stored.mainPostLikeThreshold;
+      state.mainPostLikeThresholdMax = stored.mainPostLikeThreshold;
+    }
+    if (stored.runTopicLimit === undefined) {
+      state.runTopicLimit = state.maxRunTopicsMin;
+    }
+    if (stored.runMinutesLimit === undefined) {
+      state.runMinutesLimit = state.maxRunMinutesMin;
+    }
+    return state;
+  };
 
   const saveState = (patch) => {
     const next = { ...loadState(), ...patch };
@@ -72,7 +146,64 @@
   const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
   const randomInt = (min, max) => Math.floor(min + Math.random() * (max - min + 1));
   const isTopicPage = () => /^\/t\//.test(location.pathname);
-  const isListPage = () => /^(\/|\/latest|\/new|\/top|\/categories)$/.test(location.pathname);
+  const isListPage = () =>
+    /^(\/|\/latest|\/new|\/unread|\/top|\/categories)(\?.*)?$/.test(location.pathname + location.search) ||
+    /^\/c\//.test(location.pathname);
+  const isHostAllowed = () => {
+    const host = location.hostname.toLowerCase();
+    return DOMAIN_WHITELIST.some((domain) => host === domain || host.endsWith(`.${domain}`));
+  };
+
+  function gaussianRandom() {
+    let u = 0;
+    let v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+
+  // Uniform by default; when 正态随机 is enabled, sample a truncated normal with the
+  // mean at the range center and sigma = range / 6 (about 99.7% of samples stay in range).
+  function sampleRange(min, max) {
+    let low = min;
+    let high = max;
+    if (high < low) [low, high] = [high, low];
+    if (!loadState().normalDistribution) return randomInt(low, high);
+
+    const mean = (low + high) / 2;
+    const sigma = (high - low) / 6;
+    const value = mean + gaussianRandom() * sigma;
+    return Math.min(high, Math.max(low, Math.round(value)));
+  }
+
+  const CHALLENGE_SELECTOR = [
+    "#challenge-form",
+    "#challenge-error-text",
+    "#challenge-running",
+    "#cf-challenge-running",
+    "#cf-please-wait",
+    ".cf-turnstile",
+    "iframe[src*='challenges.cloudflare.com']",
+    "script[src*='/cdn-cgi/challenge-platform/']",
+  ].join(",");
+  const CHALLENGE_TITLE_PATTERN =
+    /just a moment|attention required|checking your browser|verify you are human|安全验证|请完成验证|请稍后重试/i;
+
+  function detectChallenge() {
+    if (document.querySelector(CHALLENGE_SELECTOR)) return true;
+    return CHALLENGE_TITLE_PATTERN.test(document.title || "");
+  }
+
+  // Pauses all automation while a challenge page is up so the user can solve it manually.
+  // Never clicks, reloads, or navigates on its own while waiting.
+  async function waitForChallengeToClear() {
+    if (!detectChallenge()) return true;
+    while (loadState().enabled && detectChallenge()) {
+      setStatus("检测到 CF 盾/人机验证，已暂停自动化，请手动完成验证");
+      if (!(await sleepWithRunLimit(sampleRange(6000, 12000)))) return false;
+    }
+    return !detectChallenge();
+  }
 
   function todayKey() {
     const now = new Date();
@@ -245,7 +376,7 @@
     panel.id = "linuxdo-read-only-helper";
     panel.innerHTML = `
       <div class="ldo-roh-header">
-        <div class="ldo-roh-title">LINUX DO 只读浏览</div>
+        <div class="ldo-roh-title">论坛只读浏览</div>
         <button type="button" class="ldo-roh-collapse" data-role="collapse"></button>
       </div>
       <div class="ldo-roh-content">
@@ -274,19 +405,46 @@
           </span>
         </label>
         <label>读几篇休息
-          <input type="number" min="1" max="200" step="1" data-role="break-after">
+          <span>
+            <input type="number" min="1" max="200" step="1" data-role="break-after-min">
+            -
+            <input type="number" min="1" max="200" step="1" data-role="break-after-max">
+          </span>
         </label>
         <label>休息秒数
-          <input type="number" min="10" max="86400" step="10" data-role="long-break">
+          <span>
+            <input type="number" min="10" max="86400" step="10" data-role="min-long-break">
+            -
+            <input type="number" min="10" max="86400" step="10" data-role="max-long-break">
+          </span>
         </label>
-        <label>最大帖子
-          <input type="number" min="0" max="10000" step="1" data-role="max-run-topics">
+        <label title="本轮开始时在该范围内随机取样本轮篇数上限；填 0 表示不限制">
+          最大帖子
+          <span>
+            <input type="number" min="0" max="10000" step="1" data-role="max-run-topics-min">
+            -
+            <input type="number" min="0" max="10000" step="1" data-role="max-run-topics-max">
+          </span>
         </label>
-        <label>最长分钟
-          <input type="number" min="0" max="10080" step="1" data-role="max-run-minutes">
+        <label title="本轮开始时在该范围内随机取样运行分钟上限；填 0 表示不限制">
+          最长分钟
+          <span>
+            <input type="number" min="0" max="10080" step="1" data-role="max-run-minutes-min">
+            -
+            <input type="number" min="0" max="10080" step="1" data-role="max-run-minutes-max">
+          </span>
         </label>
-        <label>主帖赞阈值
-          <input type="number" min="0" max="1000000" step="1" data-role="like-threshold">
+        <label title="勾选后所有随机时长/步数按截断正态分布取值，中心为区间中点">
+          正态随机
+          <input type="checkbox" data-role="normal-dist">
+        </label>
+        <label title="每篇帖子在该范围内随机取样点赞阈值；填 0 表示关闭点赞提示与自动点赞">
+          主帖赞阈值
+          <span>
+            <input type="number" min="0" max="1000000" step="1" data-role="like-threshold-min">
+            -
+            <input type="number" min="0" max="1000000" step="1" data-role="like-threshold-max">
+          </span>
         </label>
         <label>自动点赞
           <input type="checkbox" data-role="auto-like">
@@ -512,12 +670,12 @@
 
   function formatRunSummary(state) {
     const parts = [];
-    if (state.maxRunTopics > 0) {
-      parts.push(`本轮 ${state.runCompletedTopics || 0}/${state.maxRunTopics} 篇`);
+    if ((state.runTopicLimit || 0) > 0) {
+      parts.push(`本轮 ${state.runCompletedTopics || 0}/${state.runTopicLimit} 篇`);
     }
-    if (state.maxRunMinutes > 0) {
+    if ((state.runMinutesLimit || 0) > 0) {
       const elapsed = state.runStartedAt ? formatElapsedMinutes(Date.now() - state.runStartedAt) : 0;
-      parts.push(`${elapsed}/${state.maxRunMinutes} 分`);
+      parts.push(`${elapsed}/${state.runMinutesLimit} 分`);
     }
 
     return parts.length ? ` / ${parts.join(" / ")}` : "";
@@ -525,13 +683,15 @@
 
   function getRunLimitReason(state = loadState()) {
     if (!state.enabled) return "";
-    if (state.maxRunTopics > 0 && (state.runCompletedTopics || 0) >= state.maxRunTopics) {
-      return `已读满本轮 ${state.maxRunTopics} 篇，自动停止`;
+    const topicLimit = state.runTopicLimit || 0;
+    if (topicLimit > 0 && (state.runCompletedTopics || 0) >= topicLimit) {
+      return `已读满本轮 ${topicLimit} 篇，自动停止`;
     }
-    if (state.maxRunMinutes > 0 && state.runStartedAt > 0) {
+    const minutesLimit = state.runMinutesLimit || 0;
+    if (minutesLimit > 0 && state.runStartedAt > 0) {
       const elapsedMs = Date.now() - state.runStartedAt;
-      if (elapsedMs >= state.maxRunMinutes * 60000) {
-        return `本轮运行 ${state.maxRunMinutes} 分钟，自动停止`;
+      if (elapsedMs >= minutesLimit * 60000) {
+        return `本轮运行 ${minutesLimit} 分钟，自动停止`;
       }
     }
 
@@ -566,11 +726,17 @@
     panel.querySelector('[data-role="max-pause"]').value = Math.round(state.maxPauseMs / 1000);
     panel.querySelector('[data-role="min-steps"]').value = state.scrollStepsMin;
     panel.querySelector('[data-role="max-steps"]').value = state.scrollStepsMax;
-    panel.querySelector('[data-role="break-after"]').value = state.breakAfterTopics;
-    panel.querySelector('[data-role="long-break"]').value = Math.round(state.longBreakMs / 1000);
-    panel.querySelector('[data-role="max-run-topics"]').value = state.maxRunTopics;
-    panel.querySelector('[data-role="max-run-minutes"]').value = state.maxRunMinutes;
-    panel.querySelector('[data-role="like-threshold"]').value = state.mainPostLikeThreshold;
+    panel.querySelector('[data-role="break-after-min"]').value = state.breakAfterTopicsMin;
+    panel.querySelector('[data-role="break-after-max"]').value = state.breakAfterTopicsMax;
+    panel.querySelector('[data-role="min-long-break"]').value = Math.round(state.longBreakMinMs / 1000);
+    panel.querySelector('[data-role="max-long-break"]').value = Math.round(state.longBreakMaxMs / 1000);
+    panel.querySelector('[data-role="normal-dist"]').checked = Boolean(state.normalDistribution);
+    panel.querySelector('[data-role="max-run-topics-min"]').value = state.maxRunTopicsMin;
+    panel.querySelector('[data-role="max-run-topics-max"]').value = state.maxRunTopicsMax;
+    panel.querySelector('[data-role="max-run-minutes-min"]').value = state.maxRunMinutesMin;
+    panel.querySelector('[data-role="max-run-minutes-max"]').value = state.maxRunMinutesMax;
+    panel.querySelector('[data-role="like-threshold-min"]').value = state.mainPostLikeThresholdMin;
+    panel.querySelector('[data-role="like-threshold-max"]').value = state.mainPostLikeThresholdMax;
     panel.querySelector('[data-role="auto-like"]').checked = state.autoLikeMainPost;
   }
 
@@ -592,40 +758,93 @@
       30,
       DEFAULTS.scrollStepsMax
     );
-    const breakAfterTopics = positiveInt(
-      panel.querySelector('[data-role="break-after"]').value,
+    let breakAfterTopicsMin = positiveInt(
+      panel.querySelector('[data-role="break-after-min"]').value,
       1,
       200,
-      DEFAULTS.breakAfterTopics
+      DEFAULTS.breakAfterTopicsMin
     );
-    const longBreakMs =
-      positiveInt(panel.querySelector('[data-role="long-break"]').value, 10, 86400, DEFAULTS.longBreakMs / 1000) *
+    let breakAfterTopicsMax = positiveInt(
+      panel.querySelector('[data-role="break-after-max"]').value,
+      1,
+      200,
+      DEFAULTS.breakAfterTopicsMax
+    );
+    let longBreakMinMs =
+      positiveInt(panel.querySelector('[data-role="min-long-break"]').value, 10, 86400, DEFAULTS.longBreakMinMs / 1000) *
       1000;
-    const maxRunTopics = positiveInt(
-      panel.querySelector('[data-role="max-run-topics"]').value,
+    let longBreakMaxMs =
+      positiveInt(panel.querySelector('[data-role="max-long-break"]').value, 10, 86400, DEFAULTS.longBreakMaxMs / 1000) *
+      1000;
+    let maxRunTopicsMin = positiveInt(
+      panel.querySelector('[data-role="max-run-topics-min"]').value,
       0,
       10000,
-      DEFAULTS.maxRunTopics
+      DEFAULTS.maxRunTopicsMin
     );
-    const maxRunMinutes = positiveInt(
-      panel.querySelector('[data-role="max-run-minutes"]').value,
+    let maxRunTopicsMax = positiveInt(
+      panel.querySelector('[data-role="max-run-topics-max"]').value,
+      0,
+      10000,
+      DEFAULTS.maxRunTopicsMax
+    );
+    let maxRunMinutesMin = positiveInt(
+      panel.querySelector('[data-role="max-run-minutes-min"]').value,
       0,
       10080,
-      DEFAULTS.maxRunMinutes
+      DEFAULTS.maxRunMinutesMin
     );
-    const mainPostLikeThreshold = positiveInt(
-      panel.querySelector('[data-role="like-threshold"]').value,
+    let maxRunMinutesMax = positiveInt(
+      panel.querySelector('[data-role="max-run-minutes-max"]').value,
+      0,
+      10080,
+      DEFAULTS.maxRunMinutesMax
+    );
+    let mainPostLikeThresholdMin = positiveInt(
+      panel.querySelector('[data-role="like-threshold-min"]').value,
       0,
       1000000,
-      DEFAULTS.mainPostLikeThreshold
+      DEFAULTS.mainPostLikeThresholdMin
     );
-    const autoLikeMainPost = panel.querySelector('[data-role="auto-like"]').checked;
+    let mainPostLikeThresholdMax = positiveInt(
+      panel.querySelector('[data-role="like-threshold-max"]').value,
+      0,
+      1000000,
+      DEFAULTS.mainPostLikeThresholdMax
+    );
+    const normalDistribution = panel.querySelector('[data-role="normal-dist"]').checked;
 
     if (minReadMs > maxReadMs) [minReadMs, maxReadMs] = [maxReadMs, minReadMs];
     if (minPauseMs > maxPauseMs) [minPauseMs, maxPauseMs] = [maxPauseMs, minPauseMs];
     if (scrollStepsMax !== 0 && scrollStepsMin > scrollStepsMax) {
       [scrollStepsMin, scrollStepsMax] = [scrollStepsMax, scrollStepsMin];
     }
+    if (breakAfterTopicsMin > breakAfterTopicsMax) {
+      [breakAfterTopicsMin, breakAfterTopicsMax] = [breakAfterTopicsMax, breakAfterTopicsMin];
+    }
+    if (longBreakMinMs > longBreakMaxMs) {
+      [longBreakMinMs, longBreakMaxMs] = [longBreakMaxMs, longBreakMinMs];
+    }
+    // A zero on either side means "unlimited / off": keep the pair all-zero instead of swapping.
+    if (maxRunTopicsMin === 0 || maxRunTopicsMax === 0) {
+      maxRunTopicsMin = 0;
+      maxRunTopicsMax = 0;
+    } else if (maxRunTopicsMin > maxRunTopicsMax) {
+      [maxRunTopicsMin, maxRunTopicsMax] = [maxRunTopicsMax, maxRunTopicsMin];
+    }
+    if (maxRunMinutesMin === 0 || maxRunMinutesMax === 0) {
+      maxRunMinutesMin = 0;
+      maxRunMinutesMax = 0;
+    } else if (maxRunMinutesMin > maxRunMinutesMax) {
+      [maxRunMinutesMin, maxRunMinutesMax] = [maxRunMinutesMax, maxRunMinutesMin];
+    }
+    if (mainPostLikeThresholdMin === 0 || mainPostLikeThresholdMax === 0) {
+      mainPostLikeThresholdMin = 0;
+      mainPostLikeThresholdMax = 0;
+    } else if (mainPostLikeThresholdMin > mainPostLikeThresholdMax) {
+      [mainPostLikeThresholdMin, mainPostLikeThresholdMax] = [mainPostLikeThresholdMax, mainPostLikeThresholdMin];
+    }
+    const autoLikeMainPost = panel.querySelector('[data-role="auto-like"]').checked;
 
     saveState({
       minReadMs,
@@ -634,11 +853,17 @@
       maxPauseMs,
       scrollStepsMin,
       scrollStepsMax,
-      breakAfterTopics,
-      longBreakMs,
-      maxRunTopics,
-      maxRunMinutes,
-      mainPostLikeThreshold,
+      breakAfterTopicsMin,
+      breakAfterTopicsMax,
+      longBreakMinMs,
+      longBreakMaxMs,
+      normalDistribution,
+      maxRunTopicsMin,
+      maxRunTopicsMax,
+      maxRunMinutesMin,
+      maxRunMinutesMax,
+      mainPostLikeThresholdMin,
+      mainPostLikeThresholdMax,
       autoLikeMainPost,
     });
     syncInputsFromState();
@@ -719,7 +944,9 @@
   async function updateLikeAssist() {
     clearLikeHighlight();
     const state = loadState();
-    if (!isTopicPage() || state.mainPostLikeThreshold <= 0) {
+    // Sample a fresh threshold per topic so the like decision varies within the range.
+    const threshold = sampleRange(state.mainPostLikeThresholdMin, state.mainPostLikeThresholdMax);
+    if (!isTopicPage() || threshold <= 0) {
       setLikeHint("");
       return;
     }
@@ -730,7 +957,7 @@
       return;
     }
 
-    if (info.count >= state.mainPostLikeThreshold) {
+    if (info.count >= threshold) {
       if (info.target) info.target.classList.add("ldo-roh-like-highlight");
       if (state.autoLikeMainPost && state.enabled) {
         if (info.alreadyLiked || wasAutoLiked(location.href)) {
@@ -740,9 +967,17 @@
 
         if (info.button) {
           setLikeHint(`主帖 ${info.count} 赞，自动点赞中`);
-          await sleep(randomInt(700, 1800));
+          await sleep(sampleRange(700, 1800));
           const latest = loadState();
-          if (!latest.enabled || !latest.autoLikeMainPost || !isTopicPage() || !info.button.isConnected) return;
+          if (
+            !latest.enabled ||
+            !latest.autoLikeMainPost ||
+            !isTopicPage() ||
+            !info.button.isConnected ||
+            detectChallenge()
+          ) {
+            return;
+          }
           info.button.click();
           rememberAutoLiked(location.href);
           incrementDailyLikeCount();
@@ -781,18 +1016,24 @@
     toggle.addEventListener("click", () => {
       saveInputsToState();
       const enabled = !loadState().enabled;
+      const nextState = loadState();
       saveState({
         enabled,
         idleCycles: 0,
         topicsReadInBatch: 0,
         topicsReadSinceListRefresh: 0,
+        breakAfterTarget: sampleRange(nextState.breakAfterTopicsMin, nextState.breakAfterTopicsMax),
+        runTopicLimit: enabled ? sampleRange(nextState.maxRunTopicsMin, nextState.maxRunTopicsMax) : nextState.runTopicLimit,
+        runMinutesLimit: enabled
+          ? sampleRange(nextState.maxRunMinutesMin, nextState.maxRunMinutesMax)
+          : nextState.runMinutesLimit,
         runStartedAt: enabled ? Date.now() : 0,
-        runCompletedTopics: enabled ? 0 : loadState().runCompletedTopics,
+        runCompletedTopics: enabled ? 0 : nextState.runCompletedTopics,
       });
       setStatus(enabled ? "已启动，前往最新贴" : "已停止");
       window.setTimeout(() => {
         if (enabled) {
-          location.href = "https://linux.do/latest";
+          location.href = `${location.origin}/latest`;
           return;
         }
 
@@ -831,9 +1072,9 @@
 
   async function scrollTopicLikeReading() {
     const state = loadState();
-    const totalReadMs = randomInt(state.minReadMs, state.maxReadMs);
+    const totalReadMs = sampleRange(state.minReadMs, state.maxReadMs);
     const requireBottom = state.scrollStepsMax === 0;
-    const steps = requireBottom ? state.scrollStepsMin : randomInt(state.scrollStepsMin, state.scrollStepsMax);
+    const steps = requireBottom ? state.scrollStepsMin : sampleRange(state.scrollStepsMin, state.scrollStepsMax);
     const stepDelay = Math.max(2500, Math.floor(totalReadMs / steps));
 
     for (let i = 0; i < steps; i += 1) {
@@ -841,11 +1082,11 @@
 
       setStatus(`阅读帖子中 ${i + 1}/${steps}`);
       window.scrollBy({
-        top: randomInt(260, 760),
+        top: sampleRange(260, 760),
         left: 0,
         behavior: "smooth",
       });
-      if (!(await sleepWithRunLimit(stepDelay + randomInt(-900, 1400)))) return false;
+      if (!(await sleepWithRunLimit(stepDelay + sampleRange(-900, 1400)))) return false;
 
       if (isTopicBottomVisible()) {
         setStatus(`已读到底 ${i + 1}/${steps}`);
@@ -869,31 +1110,32 @@
       extraStep += 1;
       setStatus(formatTopicBottomStatus(`继续下拉到底 ${extraStep}`));
       window.scrollBy({
-        top: randomInt(420, 980),
+        top: sampleRange(420, 980),
         left: 0,
         behavior: "smooth",
       });
-      if (!(await sleepWithRunLimit(randomInt(2200, 5200)))) return false;
+      if (!(await sleepWithRunLimit(sampleRange(2200, 5200)))) return false;
     }
 
     return false;
   }
 
   async function scrollListLikeBrowsingMore() {
-    const steps = randomInt(2, 5);
+    const steps = sampleRange(2, 5);
     for (let i = 0; i < steps; i += 1) {
       if (!loadState().enabled) return;
       setStatus(`列表下拉找新话题 ${i + 1}/${steps}`);
       window.scrollBy({
-        top: randomInt(480, 1250),
+        top: sampleRange(480, 1250),
         left: 0,
         behavior: "smooth",
       });
-      if (!(await sleepWithRunLimit(randomInt(1800, 5200)))) return;
+      if (!(await sleepWithRunLimit(sampleRange(1800, 5200)))) return;
     }
   }
 
   function clickTopicLink(anchor) {
+    if (detectChallenge()) return;
     anchor.removeAttribute("target");
     anchor.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, cancelable: true }));
     anchor.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
@@ -933,6 +1175,7 @@
 
   async function runOnTopicPage() {
     if (stopIfRunLimitReached()) return;
+    if (!(await waitForChallengeToClear())) return;
     rememberVisited(location.href);
     rememberDailyTopic(location.href);
     syncDailyReadCount();
@@ -940,7 +1183,7 @@
     const state = loadState();
     await updateLikeAssist();
     setStatus("停留阅读中");
-    if (!(await sleepWithRunLimit(randomInt(state.minPauseMs, state.maxPauseMs)))) return;
+    if (!(await sleepWithRunLimit(sampleRange(state.minPauseMs, state.maxPauseMs)))) return;
     const completed = await scrollTopicLikeReading();
 
     if (loadState().enabled) {
@@ -956,15 +1199,18 @@
 
         if (stopIfRunLimitReached()) return;
 
-        if (topicsReadInBatch >= nextState.breakAfterTopics) {
+        if (topicsReadInBatch >= nextState.breakAfterTarget) {
           setStatus(`已读 ${topicsReadInBatch} 篇，休息中`);
-          if (!(await sleepWithRunLimit(nextState.longBreakMs))) return;
+          if (!(await sleepWithRunLimit(sampleRange(nextState.longBreakMinMs, nextState.longBreakMaxMs)))) return;
           if (!loadState().enabled) return;
-          saveState({ topicsReadInBatch: 0 });
+          saveState({
+            topicsReadInBatch: 0,
+            breakAfterTarget: sampleRange(nextState.breakAfterTopicsMin, nextState.breakAfterTopicsMax),
+          });
         }
       } else {
         setStatus("未完成阅读，跳过不计已读");
-        await sleepWithRunLimit(randomInt(state.minPauseMs, state.maxPauseMs));
+        await sleepWithRunLimit(sampleRange(state.minPauseMs, state.maxPauseMs));
       }
 
       setStatus("返回最新列表");
@@ -985,7 +1231,7 @@
 
             setStatus("已返回列表，继续找下一篇");
             runOnListPage().catch((error) => {
-              console.error("[LINUX DO Read-Only Browse Helper]", error);
+              console.error("[Forum Read-Only Browse Helper]", error);
               setStatus("脚本遇到错误，已停止");
               saveState({ enabled: false });
             });
@@ -993,19 +1239,20 @@
           }
 
           if (location.href === beforeUrl || !isListPage()) {
-            location.href = "https://linux.do/latest";
+            location.href = `${location.origin}/latest`;
           }
         }, 3500);
         return;
       }
 
-      location.href = "https://linux.do/latest";
+      location.href = `${location.origin}/latest`;
     }
   }
 
   async function runOnListPage() {
     if (stopIfRunLimitReached()) return;
-    if (!(await sleepWithRunLimit(randomInt(2000, 5000)))) return;
+    if (!(await waitForChallengeToClear())) return;
+    if (!(await sleepWithRunLimit(sampleRange(2000, 5000)))) return;
     if (stopIfRunLimitReached()) return;
     const topic = chooseNextTopic();
 
@@ -1014,17 +1261,17 @@
       const idleCycles = (state.idleCycles || 0) + 1;
       saveState({ idleCycles });
       setStatus("未找到未读帖子，向下找一找");
-      window.scrollBy({ top: randomInt(650, 1600), left: 0, behavior: "smooth" });
-      if (!(await sleepWithRunLimit(randomInt(9000, 22000)))) return;
+      window.scrollBy({ top: sampleRange(650, 1600), left: 0, behavior: "smooth" });
+      if (!(await sleepWithRunLimit(sampleRange(9000, 22000)))) return;
 
       if (!loadState().enabled) return;
       if (idleCycles >= 3) {
         saveState({ idleCycles: 0 });
         setStatus("可见列表读完，继续加载更多话题");
-        if (!(await sleepWithRunLimit(randomInt(4000, 9000)))) return;
+        if (!(await sleepWithRunLimit(sampleRange(4000, 9000)))) return;
         await scrollListLikeBrowsingMore();
         if (!loadState().enabled || stopIfRunLimitReached()) return;
-        location.href = "https://linux.do/latest";
+        location.href = `${location.origin}/latest`;
         return;
       }
 
@@ -1034,8 +1281,12 @@
 
     saveState({ idleCycles: 0 });
     setStatus(`准备打开：${topic.title.slice(0, 26)}`);
-    if (!(await sleepWithRunLimit(randomInt(loadState().minPauseMs, loadState().maxPauseMs)))) return;
+    if (!(await sleepWithRunLimit(sampleRange(loadState().minPauseMs, loadState().maxPauseMs)))) return;
     if (loadState().enabled && !stopIfRunLimitReached()) {
+      if (detectChallenge()) {
+        setStatus("检测到 CF 盾/人机验证，已暂停自动化，请手动完成验证");
+        return;
+      }
       rememberVisited(topic.url);
       const beforeUrl = location.href;
       setStatus(`点击进入：${topic.title.slice(0, 26)}`);
@@ -1057,8 +1308,15 @@
   }
 
   async function main() {
+    if (!isHostAllowed()) return;
     setupPanel();
     const state = loadState();
+    if (state.enabled && detectChallenge()) {
+      if (!(await waitForChallengeToClear())) return;
+      setStatus("人机验证已通过，刷新继续");
+      location.reload();
+      return;
+    }
     await updateLikeAssist();
     if (!state.enabled) return;
     if (!state.runStartedAt) saveState({ runStartedAt: Date.now(), runCompletedTopics: state.runCompletedTopics || 0 });
@@ -1071,8 +1329,8 @@
 
     if (!isListPage()) {
       setStatus("前往最新列表");
-      if (!(await sleepWithRunLimit(randomInt(2000, 5000)))) return;
-      if (loadState().enabled) location.href = "https://linux.do/latest";
+      if (!(await sleepWithRunLimit(sampleRange(2000, 5000)))) return;
+      if (loadState().enabled) location.href = `${location.origin}/latest`;
       return;
     }
 
@@ -1080,7 +1338,7 @@
   }
 
   main().catch((error) => {
-    console.error("[LINUX DO Read-Only Browse Helper]", error);
+    console.error("[Forum Read-Only Browse Helper]", error);
     setStatus("脚本遇到错误，已停止");
     saveState({ enabled: false });
   });
