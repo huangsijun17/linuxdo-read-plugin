@@ -228,6 +228,15 @@
     return Math.round(clampNumber(value, min, max, fallback));
   }
 
+  // All-zero keeps "unlimited / off"; otherwise order the pair and lift a zero side
+  // to 1 so editing one side of a 0-0 pair works and sampling never yields the
+  // "unlimited" value by chance.
+  function normalizeLimitRange(min, max) {
+    if (min === 0 && max === 0) return [0, 0];
+    if (min > max) [min, max] = [max, min];
+    return [Math.max(1, min), max];
+  }
+
   function formatElapsedMinutes(ms) {
     return Math.max(0, Math.floor(ms / 60000));
   }
@@ -387,9 +396,9 @@
         <div class="ldo-roh-like-hint" data-role="like-hint"></div>
         <label>阅读秒数
           <span>
-            <input type="number" min="10" max="3600" step="5" data-role="min-read">
+            <input type="number" min="10" max="3600" step="1" data-role="min-read">
             -
-            <input type="number" min="10" max="3600" step="5" data-role="max-read">
+            <input type="number" min="10" max="3600" step="1" data-role="max-read">
           </span>
         </label>
         <label>间隔秒数
@@ -415,12 +424,12 @@
         </label>
         <label>休息秒数
           <span>
-            <input type="number" min="10" max="86400" step="10" data-role="min-long-break">
+            <input type="number" min="10" max="86400" step="1" data-role="min-long-break">
             -
-            <input type="number" min="10" max="86400" step="10" data-role="max-long-break">
+            <input type="number" min="10" max="86400" step="1" data-role="max-long-break">
           </span>
         </label>
-        <label title="本轮开始时在该范围内随机取样本轮篇数上限；填 0 表示不限制">
+        <label title="本轮开始时在该范围内随机取样本轮篇数上限；两个都为 0 表示不限制，只填一侧时另一侧按 1 处理">
           最大帖子
           <span>
             <input type="number" min="0" max="10000" step="1" data-role="max-run-topics-min">
@@ -428,7 +437,7 @@
             <input type="number" min="0" max="10000" step="1" data-role="max-run-topics-max">
           </span>
         </label>
-        <label title="本轮开始时在该范围内随机取样运行分钟上限；填 0 表示不限制">
+        <label title="本轮开始时在该范围内随机取样运行分钟上限；两个都为 0 表示不限制，只填一侧时另一侧按 1 处理">
           最长分钟
           <span>
             <input type="number" min="0" max="10080" step="1" data-role="max-run-minutes-min">
@@ -440,7 +449,7 @@
           正态随机
           <input type="checkbox" data-role="normal-dist">
         </label>
-        <label title="每篇帖子在该范围内随机取样点赞阈值；填 0 表示关闭点赞提示与自动点赞">
+        <label title="每篇帖子在该范围内随机取样点赞阈值；两个都为 0 表示关闭点赞提示与自动点赞，只填一侧时另一侧按 1 处理">
           主帖赞阈值
           <span>
             <input type="number" min="0" max="1000000" step="1" data-role="like-threshold-min">
@@ -608,6 +617,15 @@
         padding: 5px 6px;
         color: #111;
         background: #fff;
+      }
+      #linuxdo-read-only-helper input[type="number"]::-webkit-outer-spin-button,
+      #linuxdo-read-only-helper input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      #linuxdo-read-only-helper input[type="number"] {
+        -moz-appearance: textfield;
+        appearance: textfield;
       }
       #linuxdo-read-only-helper input[type="checkbox"] {
         width: auto;
@@ -861,24 +879,12 @@
       [longBreakMinMs, longBreakMaxMs] = [longBreakMaxMs, longBreakMinMs];
     }
     // A zero on either side means "unlimited / off": keep the pair all-zero instead of swapping.
-    if (maxRunTopicsMin === 0 || maxRunTopicsMax === 0) {
-      maxRunTopicsMin = 0;
-      maxRunTopicsMax = 0;
-    } else if (maxRunTopicsMin > maxRunTopicsMax) {
-      [maxRunTopicsMin, maxRunTopicsMax] = [maxRunTopicsMax, maxRunTopicsMin];
-    }
-    if (maxRunMinutesMin === 0 || maxRunMinutesMax === 0) {
-      maxRunMinutesMin = 0;
-      maxRunMinutesMax = 0;
-    } else if (maxRunMinutesMin > maxRunMinutesMax) {
-      [maxRunMinutesMin, maxRunMinutesMax] = [maxRunMinutesMax, maxRunMinutesMin];
-    }
-    if (mainPostLikeThresholdMin === 0 || mainPostLikeThresholdMax === 0) {
-      mainPostLikeThresholdMin = 0;
-      mainPostLikeThresholdMax = 0;
-    } else if (mainPostLikeThresholdMin > mainPostLikeThresholdMax) {
-      [mainPostLikeThresholdMin, mainPostLikeThresholdMax] = [mainPostLikeThresholdMax, mainPostLikeThresholdMin];
-    }
+    [maxRunTopicsMin, maxRunTopicsMax] = normalizeLimitRange(maxRunTopicsMin, maxRunTopicsMax);
+    [maxRunMinutesMin, maxRunMinutesMax] = normalizeLimitRange(maxRunMinutesMin, maxRunMinutesMax);
+    [mainPostLikeThresholdMin, mainPostLikeThresholdMax] = normalizeLimitRange(
+      mainPostLikeThresholdMin,
+      mainPostLikeThresholdMax
+    );
     const autoLikeMainPost = panel.querySelector('[data-role="auto-like"]').checked;
 
     saveState({
