@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Forum Read-Only Browse Helper
 // @namespace    https://github.com/huangsijun17/linuxdo-read-plugin
-// @version      0.5.2
+// @version      0.5.3
 // @description  Read topics on whitelisted Discourse-style forums with visible, manual controls, optional assistive main-post likes, normal-distribution timing, and simple anti-bot challenge detection. No comments, bookmarks, or other interactions.
 // @author       huangsijun17
 // @match        https://linux.do/*
@@ -507,6 +507,7 @@
         padding: 0;
         border-radius: 50%;
         background: rgba(32, 34, 37, 0.96);
+        transition: left 0.2s ease, top 0.2s ease;
       }
       #linuxdo-read-only-helper.ldo-roh-collapsed .ldo-roh-title,
       #linuxdo-read-only-helper.ldo-roh-collapsed .ldo-roh-content {
@@ -661,9 +662,10 @@
     return panel;
   }
 
-  // Places the panel/logo at the persisted anchor: snapped to the left/right edge,
-  // with panelY as the vertical position. panelY < 0 keeps the default corner spot.
-  function applyPanelPosition() {
+  // Places the panel/logo at the persisted anchor: snapped to the left/right edge.
+  // A collapsed logo idles half-tucked off-screen; hover/drag reveals it.
+  // panelY < 0 keeps the default corner spot with no tucking.
+  function applyPanelPosition(reveal = false) {
     const panel = buildPanel();
     const state = loadState();
     const y = Number(state.panelY);
@@ -676,11 +678,20 @@
     }
 
     const collapsed = panel.classList.contains("ldo-roh-collapsed");
-    const width = collapsed ? 58 : panel.offsetWidth || 230;
-    const height = collapsed ? 58 : panel.offsetHeight || 320;
     const side = state.panelSide === "left" ? "left" : "right";
-    const left = side === "right" ? Math.max(16, window.innerWidth - width - 16) : 16;
-    const top = Math.min(Math.max(y, 8), Math.max(8, window.innerHeight - height - 8));
+    let left;
+    let top;
+
+    if (collapsed) {
+      const hidden = reveal ? 6 : 30;
+      left = side === "left" ? -hidden : window.innerWidth - 58 + hidden;
+      top = Math.min(Math.max(y, 8), Math.max(8, window.innerHeight - 58 - 8));
+    } else {
+      const width = panel.offsetWidth || 230;
+      const height = panel.offsetHeight || 320;
+      left = side === "right" ? Math.max(16, window.innerWidth - width - 16) : 16;
+      top = Math.min(Math.max(y, 8), Math.max(8, window.innerHeight - height - 8));
+    }
 
     panel.style.right = "auto";
     panel.style.bottom = "auto";
@@ -1049,7 +1060,7 @@
     syncPanelVisibility();
     syncDailyReadCount();
     applyPanelPosition();
-    window.addEventListener("resize", applyPanelPosition);
+    window.addEventListener("resize", () => applyPanelPosition());
 
     let dragState = null;
     let suppressCollapseClick = false;
@@ -1066,13 +1077,19 @@
         panelSide: rect.left + rect.width / 2 < window.innerWidth / 2 ? "left" : "right",
         panelY: rect.top,
       });
-      const panelNow = buildPanel();
-      panelNow.style.transition = "left 0.15s ease, top 0.15s ease";
+      buildPanel().style.transition = "";
       applyPanelPosition();
-      window.setTimeout(() => {
-        buildPanel().style.transition = "";
-      }, 220);
     };
+
+    collapse.addEventListener("mouseenter", () => {
+      if (dragState || !buildPanel().classList.contains("ldo-roh-collapsed")) return;
+      applyPanelPosition(true);
+    });
+
+    collapse.addEventListener("mouseleave", () => {
+      if (dragState || !buildPanel().classList.contains("ldo-roh-collapsed")) return;
+      applyPanelPosition(false);
+    });
 
     collapse.addEventListener("pointerdown", (event) => {
       if (!event.isPrimary || !buildPanel().classList.contains("ldo-roh-collapsed")) return;
