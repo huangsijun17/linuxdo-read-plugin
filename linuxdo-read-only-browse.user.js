@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Forum Read-Only Browse Helper
 // @namespace    https://github.com/huangsijun17/linuxdo-read-plugin
-// @version      0.5.4
+// @version      0.5.5
 // @description  Read topics on whitelisted Discourse-style forums with visible, manual controls, optional assistive main-post likes, normal-distribution timing, and simple anti-bot challenge detection. No comments, bookmarks, or other interactions.
 // @author       huangsijun17
 // @match        https://linux.do/*
@@ -178,20 +178,22 @@
     return Math.min(high, Math.max(low, Math.round(value)));
   }
 
+  // Only markers that exist on Cloudflare's full-page interstitial itself.
+  // Never match scripts/iframes like /cdn-cgi/challenge-platform/ or
+  // .cf-turnstile here: normal forum pages behind Cloudflare embed those too.
   const CHALLENGE_SELECTOR = [
     "#challenge-form",
     "#challenge-error-text",
     "#challenge-running",
     "#cf-challenge-running",
     "#cf-please-wait",
-    ".cf-turnstile",
-    "iframe[src*='challenges.cloudflare.com']",
-    "script[src*='/cdn-cgi/challenge-platform/']",
   ].join(",");
   const CHALLENGE_TITLE_PATTERN =
     /just a moment|attention required|checking your browser|verify you are human|安全验证|请完成验证|请稍后重试/i;
 
   function detectChallenge() {
+    // A page that has not finished loading says nothing; judge only when complete.
+    if (document.readyState !== "complete") return false;
     if (document.querySelector(CHALLENGE_SELECTOR)) return true;
     return CHALLENGE_TITLE_PATTERN.test(document.title || "");
   }
