@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Forum Read-Only Browse Helper
 // @namespace    https://github.com/huangsijun17/linuxdo-read-plugin
-// @version      0.5.6
+// @version      0.5.7
 // @description  Read topics on whitelisted Discourse-style forums with visible, manual controls, optional assistive main-post likes, normal-distribution timing, and simple anti-bot challenge detection. No comments, bookmarks, or other interactions.
 // @author       huangsijun17
 // @match        https://linux.do/*
@@ -311,7 +311,11 @@
     const state = loadState();
     const visited = new Set(state.visited || []);
     const currentTopic = normalizeTopicUrl(location.href);
-    return getTopicLinks().find((topic) => topic.url !== currentTopic && !visited.has(topic.url));
+    const pool = getTopicLinks().filter((topic) => topic.url !== currentTopic && !visited.has(topic.url));
+    if (!pool.length) return null;
+    // Random pick among visible unvisited topics: the read order must never
+    // trace the list top-down.
+    return pool[sampleRange(0, pool.length - 1)];
   }
 
   function rememberVisited(url) {
