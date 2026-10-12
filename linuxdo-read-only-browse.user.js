@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Forum Read-Only Browse Helper
 // @namespace    https://github.com/huangsijun17/linuxdo-read-plugin
-// @version      0.5.7
+// @version      0.5.8
 // @description  Read topics on whitelisted Discourse-style forums with visible, manual controls, optional assistive main-post likes, normal-distribution timing, and simple anti-bot challenge detection. No comments, bookmarks, or other interactions.
 // @author       huangsijun17
 // @match        https://linux.do/*
@@ -538,6 +538,30 @@
       #linuxdo-read-only-helper.ldo-roh-collapsed .ldo-roh-collapse:active {
         cursor: grabbing;
       }
+      #linuxdo-read-only-helper.ldo-roh-running.ldo-roh-collapsed .ldo-roh-collapse {
+        outline: 2px solid #16a9e8;
+        outline-offset: -2px;
+        animation: ldo-roh-breathe 2.2s ease-in-out infinite;
+      }
+      #linuxdo-read-only-helper.ldo-roh-running.ldo-roh-collapsed .ldo-roh-collapse::before {
+        background: #16a9e8;
+      }
+      @keyframes ldo-roh-breathe {
+        0%,
+        100% {
+          transform: scale(1);
+          box-shadow: 0 0 0 0 rgba(22, 169, 232, 0.45);
+        }
+        50% {
+          transform: scale(1.07);
+          box-shadow: 0 0 0 9px rgba(22, 169, 232, 0);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #linuxdo-read-only-helper.ldo-roh-running.ldo-roh-collapsed .ldo-roh-collapse {
+          animation: none;
+        }
+      }
       #linuxdo-read-only-helper.ldo-roh-collapsed .ldo-roh-collapse::before {
         content: "";
         position: absolute;
@@ -709,6 +733,7 @@
     const panel = buildPanel();
     const state = loadState();
     panel.classList.toggle("ldo-roh-collapsed", state.panelCollapsed);
+    panel.classList.toggle("ldo-roh-running", Boolean(state.enabled));
     panel.querySelector('[data-role="collapse"]').textContent = state.panelCollapsed ? "展开" : "收起";
     applyPanelPosition();
   }
@@ -728,6 +753,7 @@
     const state = loadState();
 
     status.textContent = text;
+    panel.classList.toggle("ldo-roh-running", Boolean(state.enabled));
     toggle.textContent = state.enabled ? "停止" : "开始";
     toggle.style.background = state.enabled ? "#ffb3b3" : "#9ee493";
     syncDailyReadCount();
