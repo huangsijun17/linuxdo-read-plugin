@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Forum Read-Only Browse Helper
 // @namespace    https://github.com/huangsijun17/linuxdo-read-plugin
-// @version      0.5.5
+// @version      0.5.6
 // @description  Read topics on whitelisted Discourse-style forums with visible, manual controls, optional assistive main-post likes, normal-distribution timing, and simple anti-bot challenge detection. No comments, bookmarks, or other interactions.
 // @author       huangsijun17
 // @match        https://linux.do/*
@@ -223,7 +223,7 @@
   }
 
   function secondsToMs(value, fallbackMs) {
-    return clampNumber(value, 3, 3600, fallbackMs / 1000) * 1000;
+    return clampNumber(value, 0, 3600, fallbackMs / 1000) * 1000;
   }
 
   function positiveInt(value, min, max, fallback) {
@@ -398,37 +398,37 @@
         <div class="ldo-roh-like-hint" data-role="like-hint"></div>
         <label>阅读秒数
           <span>
-            <input type="number" min="10" max="3600" step="1" data-role="min-read">
+            <input type="number" min="0" max="3600" step="1" data-role="min-read">
             -
-            <input type="number" min="10" max="3600" step="1" data-role="max-read">
+            <input type="number" min="0" max="3600" step="1" data-role="max-read">
           </span>
         </label>
         <label>间隔秒数
           <span>
-            <input type="number" min="3" max="600" step="1" data-role="min-pause">
+            <input type="number" min="0" max="600" step="1" data-role="min-pause">
             -
-            <input type="number" min="3" max="600" step="1" data-role="max-pause">
+            <input type="number" min="0" max="600" step="1" data-role="max-pause">
           </span>
         </label>
         <label>滚动步数
           <span>
-            <input type="number" min="1" max="30" step="1" data-role="min-steps">
+            <input type="number" min="0" max="30" step="1" data-role="min-steps">
             -
             <input type="number" min="0" max="30" step="1" data-role="max-steps">
           </span>
         </label>
         <label>读几篇休息
           <span>
-            <input type="number" min="1" max="200" step="1" data-role="break-after-min">
+            <input type="number" min="0" max="200" step="1" data-role="break-after-min">
             -
-            <input type="number" min="1" max="200" step="1" data-role="break-after-max">
+            <input type="number" min="0" max="200" step="1" data-role="break-after-max">
           </span>
         </label>
         <label>休息秒数
           <span>
-            <input type="number" min="10" max="86400" step="1" data-role="min-long-break">
+            <input type="number" min="0" max="86400" step="1" data-role="min-long-break">
             -
-            <input type="number" min="10" max="86400" step="1" data-role="max-long-break">
+            <input type="number" min="0" max="86400" step="1" data-role="max-long-break">
           </span>
         </label>
         <label title="本轮开始时在该范围内随机取样本轮篇数上限；两个都为 0 表示不限制，只填一侧时另一侧按 1 处理">
@@ -814,7 +814,7 @@
     let maxPauseMs = secondsToMs(panel.querySelector('[data-role="max-pause"]').value, DEFAULTS.maxPauseMs);
     let scrollStepsMin = positiveInt(
       panel.querySelector('[data-role="min-steps"]').value,
-      1,
+      0,
       30,
       DEFAULTS.scrollStepsMin
     );
@@ -826,21 +826,21 @@
     );
     let breakAfterTopicsMin = positiveInt(
       panel.querySelector('[data-role="break-after-min"]').value,
-      1,
+      0,
       200,
       DEFAULTS.breakAfterTopicsMin
     );
     let breakAfterTopicsMax = positiveInt(
       panel.querySelector('[data-role="break-after-max"]').value,
-      1,
+      0,
       200,
       DEFAULTS.breakAfterTopicsMax
     );
     let longBreakMinMs =
-      positiveInt(panel.querySelector('[data-role="min-long-break"]').value, 10, 86400, DEFAULTS.longBreakMinMs / 1000) *
+      positiveInt(panel.querySelector('[data-role="min-long-break"]').value, 0, 86400, DEFAULTS.longBreakMinMs / 1000) *
       1000;
     let longBreakMaxMs =
-      positiveInt(panel.querySelector('[data-role="max-long-break"]').value, 10, 86400, DEFAULTS.longBreakMaxMs / 1000) *
+      positiveInt(panel.querySelector('[data-role="max-long-break"]').value, 0, 86400, DEFAULTS.longBreakMaxMs / 1000) *
       1000;
     let maxRunTopicsMin = positiveInt(
       panel.querySelector('[data-role="max-run-topics-min"]').value,
@@ -1166,14 +1166,17 @@
         runCompletedTopics: enabled ? 0 : nextState.runCompletedTopics,
       });
       setStatus(enabled ? "已启动，前往最新贴" : "已停止");
-      window.setTimeout(() => {
-        if (enabled) {
-          location.href = `${location.origin}/latest`;
-          return;
-        }
-
-        location.reload();
-      }, 600);
+      if (!enabled) {
+        // Stop in place: no reload, no navigation. In-flight loops poll
+        // enabled every second and unwind on their own.
+        clearLikeHighlight();
+        setLikeHint("");
+      } else {
+        // Re-check before jumping: a stop pressed within the delay must win.
+        window.setTimeout(() => {
+          if (loadState().enabled) location.href = `${location.origin}/latest`;
+        }, 600);
+      }
     });
 
     reset.addEventListener("click", () => {
@@ -1271,11 +1274,26 @@
 
   function clickTopicLink(anchor) {
     if (detectChallenge()) return;
-    anchor.removeAttribute("target");
-    anchor.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, cancelable: true }));
-    anchor.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-    anchor.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
-    anchor.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    // Some forums/configs route topic clicks through window.open (new tab
+    // preference); during the synthetic click force every window.open into a
+    // current-tab navigation so no extra tab is ever opened.
+    const originalOpen = window.open;
+    window.open = (...args) => {
+      const url = args.find((value) => typeof value === "string" && value);
+      if (url) location.assign(new URL(url, location.href).toString());
+      return null;
+    };
+    try {
+      anchor.removeAttribute("target");
+      anchor.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, cancelable: true }));
+      anchor.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+      anchor.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+      anchor.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    } finally {
+      window.setTimeout(() => {
+        window.open = originalOpen;
+      }, 500);
+    }
   }
 
   function isElementVisibleInViewport(element, bottomPadding = 80) {
